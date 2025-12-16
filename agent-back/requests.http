@@ -1,0 +1,28 @@
+@host = http://localhost:3000
+@conversationId = REPLACE_WITH_ID
+
+### Send message (creates conversation if not provided)
+POST {{host}}/chat
+Content-Type: application/json
+
+{
+  "conversationId": "{{conversationId}}",
+  "input": "Hello, how are you?"
+}
+
+### Open SSE stream for a conversation
+GET {{host}}/chat/stream/{{conversationId}}
+Accept: text/event-stream
+
+### Get conversation history (paginated)
+GET {{host}}/chat/{{conversationId}}?limit=10
+
+### Get messages before a given ISO date (cursor)
+# GET {{host}}/chat/{{conversationId}}?limit=10&before=2024-01-01T00:00:00.000Z
+
+### List conversations
+GET {{host}}/conversations?limit=50
+
+### SSE for conversation creations
+GET {{host}}/conversations/stream
+Accept: text/event-stream
