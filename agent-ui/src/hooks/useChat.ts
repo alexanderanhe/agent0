@@ -26,6 +26,7 @@ type UseChatState = {
   conversationsLoading: boolean
   refreshConversations: () => Promise<void>
   selectConversation: (id: string) => void
+  notFound: boolean
 }
 
 export const useChat = (): UseChatState => {
@@ -58,6 +59,7 @@ export const useChat = (): UseChatState => {
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
   const [conversationsLoading, setConversationsLoading] = useState(false)
+  const [notFound, setNotFound] = useState(false)
   const conversationStreamRef = useRef<ReturnType<typeof openConversationsStream> | null>(null)
   const streamingMessageId = useRef<string | null>(null)
   const oldestCursorRef = useRef<string | null>(null)
@@ -68,6 +70,7 @@ export const useChat = (): UseChatState => {
       setHistoryLoading(false)
       setHasMore(false)
       oldestCursorRef.current = null
+      setNotFound(false)
       return
     }
 
@@ -94,7 +97,15 @@ export const useChat = (): UseChatState => {
         oldestCursorRef.current = data.nextCursor
       } catch (err) {
         if (cancelled) return
-        setError((err as Error).message)
+        const status = (err as { status?: number }).status
+        if (status === 404) {
+          setNotFound(true)
+          setConversationIdState(null)
+          updateUrl(null)
+          setMessages([])
+        } else {
+          setError((err as Error).message)
+        }
       } finally {
         if (cancelled) return
         setHydrateHistory(false)
@@ -218,6 +229,7 @@ export const useChat = (): UseChatState => {
     oldestCursorRef.current = null
     disconnect()
     void refreshConversations()
+    setNotFound(false)
   }
 
   const selectConversation = (id: string) => {
@@ -341,5 +353,6 @@ export const useChat = (): UseChatState => {
     conversationsLoading,
     refreshConversations,
     selectConversation,
+    notFound,
   }
 }

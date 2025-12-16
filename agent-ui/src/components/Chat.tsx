@@ -22,6 +22,7 @@ export const Chat = () => {
     conversations,
     conversationsLoading,
     selectConversation,
+    notFound,
   } = useChat()
   const [input, setInput] = useState('')
   const inputRef = useRef<HTMLInputElement | null>(null)
@@ -169,41 +170,62 @@ export const Chat = () => {
           </div>
         )}
 
-        <div className="flex flex-1 min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div
-            ref={messagesContainerRef}
-            className="flex-1 space-y-4 overflow-y-auto p-4"
-            onScroll={handleScroll}
-          >
-            {(historyLoading || loadingOlder) && (
-              <div className="flex items-center justify-center py-2 text-xs text-slate-500">
-                <span className="animate-pulse">Loading messages...</span>
-              </div>
-            )}
-            {!historyLoading && messages.length === 0 && (
-              <p className="text-sm text-slate-500">
-                Start a chat by sending your first message.
+        {notFound ? (
+          <div className="flex flex-1 items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-slate-800">Conversation not found</p>
+              <p className="text-xs text-slate-500">
+                The conversation you are looking for does not exist or was removed.
               </p>
-            )}
-            {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
-            ))}
+              <button
+                type="button"
+                onClick={() => {
+                  startNewChat()
+                  setSidebarOpen(false)
+                }}
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+              >
+                Start a new chat
+              </button>
+            </div>
           </div>
-          <div className="border-t border-slate-100 bg-slate-50/50 p-4">
-            <ChatInput
-              value={input}
-              onChange={setInput}
-              onSubmit={handleSend}
-              inputRef={inputRef}
-              disabled={sending || isStreaming}
-            />
-            {(sending || isStreaming) && (
-              <p className="mt-2 text-xs text-slate-500">
-                {sending ? 'Sending message...' : 'Waiting for response...'}
-              </p>
-            )}
+        ) : (
+          <div className="flex flex-1 min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div
+              ref={messagesContainerRef}
+              className="flex-1 space-y-4 overflow-y-auto p-4"
+              onScroll={handleScroll}
+            >
+              {(historyLoading || loadingOlder) && (
+                <div className="flex items-center justify-center py-2 text-xs text-slate-500">
+                  <span className="animate-pulse">Loading messages...</span>
+                </div>
+              )}
+              {!historyLoading && messages.length === 0 && (
+                <p className="text-sm text-slate-500">
+                  Start a chat by sending your first message.
+                </p>
+              )}
+              {messages.map((message) => (
+                <MessageBubble key={message.id} message={message} />
+              ))}
+            </div>
+            <div className="border-t border-slate-100 bg-slate-50/50 p-4">
+              <ChatInput
+                value={input}
+                onChange={setInput}
+                onSubmit={handleSend}
+                inputRef={inputRef}
+                disabled={sending || isStreaming}
+              />
+              {(sending || isStreaming) && (
+                <p className="mt-2 text-xs text-slate-500">
+                  {sending ? 'Sending message...' : 'Waiting for response...'}
+                </p>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </main>
 
       {sidebarOpen && (
@@ -287,8 +309,11 @@ export const Chat = () => {
                         <span>{conv.messagesCount} msg</span>
                       </div>
                       {conv.lastMessage && (
-                        <p className="mt-1 max-h-10 overflow-hidden text-xs leading-snug text-slate-700">
-                          <strong>{conv.lastMessage.role}:</strong> {conv.lastMessage.content}
+                        <p className="mt-1 text-xs leading-snug text-slate-700 line-clamp-2">
+                          <strong className="mr-1">{conv.lastMessage.role}:</strong>
+                          <span className="inline-block max-w-full truncate align-middle">
+                            {conv.lastMessage.content}
+                          </span>
                         </p>
                       )}
                     </button>

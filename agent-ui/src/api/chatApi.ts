@@ -70,7 +70,11 @@ export const getChatHistory = async (
   const res = await fetch(url.toString())
   if (!res.ok) {
     const text = await res.text()
-    throw new Error(text || 'Error fetching chat history')
+    const err = new Error(text || 'Error fetching chat history') as Error & {
+      status?: number
+    }
+    err.status = res.status
+    throw err
   }
 
   const data = (await res.json()) as RawHistoryResponse
