@@ -14,7 +14,7 @@ export const Chat = () => {
     sseStatus,
     sseError,
     error,
-    reconnectSSE,
+    // reconnectSSE,
     historyLoading,
     loadOlderMessages,
     hasMore,
@@ -29,7 +29,7 @@ export const Chat = () => {
   const stickToBottomRef = useRef(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [toast, setToast] = useState<{ message: string; tone: 'info' | 'success' | 'error' } | null>(null)
-  const toastTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     const el = messagesContainerRef.current
