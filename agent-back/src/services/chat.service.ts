@@ -5,11 +5,22 @@ import {
   Conversation,
   ConversationDocument,
   MessageRole,
+  Message,
 } from "../models/conversation.model";
 import { sseService } from "./sse.service";
 import { HttpError } from "../utils/httpError";
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+type MessageWithIsoDate = Omit<Message, "createdAt"> & { createdAt: string };
+
+type MessagesPage = {
+  conversationId: string;
+  messages: MessageWithIsoDate[];
+  total: number;
+  hasMore: boolean;
+  nextCursor: string | null;
+};
 
 export class ChatService {
   private openai = env.openAiApiKey
@@ -62,25 +73,26 @@ export class ChatService {
   async getMessagesPage(
     conversationId: string,
     options: { before?: string; limit: number }
-  ) {
+  ): Promise<MessagesPage> {
     const conversation = await this.getConversation(conversationId);
     const limit = Math.max(1, options.limit);
     const beforeDate = options.before ? new Date(options.before) : null;
 
-    const messages = conversation
-      .toObject()
-      .messages.map((msg) => ({
-        ...msg,
+    const messages: MessageWithIsoDate[] = conversation.messages
+      .map((msg: Message) => ({
+        role: msg.role,
+        content: msg.content,
         createdAt: new Date(msg.createdAt).toISOString(),
       }))
       .sort(
-        (a, b) =>
+        (a: MessageWithIsoDate, b: MessageWithIsoDate) =>
           new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       );
 
     const filtered = beforeDate
       ? messages.filter(
-          (msg) => new Date(msg.createdAt).getTime() < beforeDate.getTime()
+          (msg: MessageWithIsoDate) =>
+            new Date(msg.createdAt).getTime() < beforeDate.getTime()
         )
       : messages;
 
