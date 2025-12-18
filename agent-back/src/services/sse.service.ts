@@ -19,6 +19,10 @@ class SSEService {
     res.on("close", () => {
       this.removeClient(conversationId, res);
     });
+
+    res.on("error", () => {
+      this.removeClient(conversationId, res);
+    });
   }
 
   removeClient(conversationId: string, res: Response) {
@@ -54,7 +58,17 @@ class SSEService {
     if (!set || set.size === 0) return;
     const data = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
     for (const res of set) {
-      res.write(data);
+      try {
+        // Skip and clean up closed streams to avoid breaking the loop mid-broadcast.
+        if (res.writableEnded || res.writableFinished) {
+          this.removeClient(conversationId, res);
+          continue;
+        }
+        res.write(data);
+      } catch (err) {
+        this.removeClient(conversationId, res);
+        console.error("Failed to write SSE event", err);
+      }
     }
   }
 }
