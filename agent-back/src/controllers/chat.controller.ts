@@ -39,11 +39,14 @@ export async function postChat(
 
     res.json({ conversationId: conversation.id, status: "streaming" });
 
-    void chatService
-      .streamAssistantResponse(conversation.id, input)
-      .catch((err) => {
+    void (async () => {
+      try {
+        await sseService.waitForClient(conversation.id, 1500);
+        await chatService.streamAssistantResponse(conversation.id, input);
+      } catch (err) {
         console.error("Streaming failed", err);
-      });
+      }
+    })();
 
     if (createdNew) {
       const summary = chatService.buildConversationSummary(updatedConversation);
@@ -107,6 +110,21 @@ export async function streamConversations(
 ) {
   try {
     sseService.addClient("conversations", res);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function deleteConversation(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const { conversationId } = conversationParamSchema.parse(req.params);
+    await chatService.deleteConversation(conversationId);
+    sseService.emitConversationDeleted(conversationId);
+    res.json({ conversationId, status: "deleted" });
   } catch (error) {
     next(error);
   }

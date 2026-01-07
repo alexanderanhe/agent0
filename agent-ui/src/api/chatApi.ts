@@ -122,3 +122,17 @@ export const getConversations = async (
       : null,
   }))
 }
+
+export const deleteConversation = async (conversationId: string) => {
+  const res = await fetch(buildUrl(`/conversations/${conversationId}`), {
+    method: 'DELETE',
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(text || 'Error deleting conversation')
+  }
+
+  const data = (await res.json()) as { conversationId: string; status: string }
+  return data
+}

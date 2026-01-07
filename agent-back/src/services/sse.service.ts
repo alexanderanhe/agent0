@@ -4,6 +4,7 @@ type SSEClient = Response;
 
 class SSEService {
   private clients = new Map<string, Set<SSEClient>>();
+  private waiters = new Map<string, Set<() => void>>();
 
   addClient(conversationId: string, res: Response) {
     res.setHeader("Content-Type", "text/event-stream");
@@ -15,6 +16,7 @@ class SSEService {
     const existing = this.clients.get(conversationId) || new Set<SSEClient>();
     existing.add(res);
     this.clients.set(conversationId, existing);
+    this.resolveWaiters(conversationId);
 
     res.on("close", () => {
       this.removeClient(conversationId, res);
@@ -34,6 +36,29 @@ class SSEService {
     }
   }
 
+  hasClient(conversationId: string) {
+    const set = this.clients.get(conversationId);
+    return Boolean(set && set.size > 0);
+  }
+
+  waitForClient(conversationId: string, timeoutMs = 1500) {
+    if (this.hasClient(conversationId)) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      const timeout = setTimeout(() => {
+        this.removeWaiter(conversationId, resolve);
+        resolve();
+      }, timeoutMs);
+      const wrappedResolve = () => {
+        clearTimeout(timeout);
+        this.removeWaiter(conversationId, wrappedResolve);
+        resolve();
+      };
+      const set = this.waiters.get(conversationId) || new Set<() => void>();
+      set.add(wrappedResolve);
+      this.waiters.set(conversationId, set);
+    });
+  }
+
   emitToken(conversationId: string, token: string) {
     this.broadcast(conversationId, "token", { token });
   }
@@ -50,6 +75,30 @@ class SSEService {
     this.broadcast("conversations", "conversation", {
       type: "created",
       conversation: summary,
+    });
+  }
+
+  private resolveWaiters(conversationId: string) {
+    const set = this.waiters.get(conversationId);
+    if (!set || set.size === 0) return;
+    for (const resolve of set) {
+      resolve();
+    }
+  }
+
+  private removeWaiter(conversationId: string, waiter: () => void) {
+    const set = this.waiters.get(conversationId);
+    if (!set) return;
+    set.delete(waiter);
+    if (set.size === 0) {
+      this.waiters.delete(conversationId);
+    }
+  }
+
+  emitConversationDeleted(conversationId: string) {
+    this.broadcast("conversations", "conversation", {
+      type: "deleted",
+      conversationId,
     });
   }
 

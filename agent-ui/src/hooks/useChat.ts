@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { getChatHistory, getConversations, postChat } from '../api/chatApi'
+import { deleteConversation as deleteConversationApi, getChatHistory, getConversations, postChat } from '../api/chatApi'
 import type { SSEStatus } from './useSSE'
 import { useSSE } from './useSSE'
 import type { Message, ConversationSummary } from '../types/chat'
@@ -26,6 +26,7 @@ type UseChatState = {
   conversationsLoading: boolean
   refreshConversations: () => Promise<void>
   selectConversation: (id: string) => void
+  deleteConversation: (id: string) => Promise<void>
   notFound: boolean
 }
 
@@ -63,6 +64,11 @@ export const useChat = (): UseChatState => {
   const conversationStreamRef = useRef<ReturnType<typeof openConversationsStream> | null>(null)
   const streamingMessageId = useRef<string | null>(null)
   const oldestCursorRef = useRef<string | null>(null)
+  const activeConversationIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    activeConversationIdRef.current = conversationId
+  }, [conversationId])
 
   useEffect(() => {
     if (!conversationId) {
@@ -270,14 +276,24 @@ export const useChat = (): UseChatState => {
           if (
             payload &&
             typeof payload === 'object' &&
-            'conversation' in payload
+            'type' in payload
           ) {
-            const conv = (payload as { conversation: ConversationSummary }).conversation
-            setConversations((prev) => {
-              const exists = prev.find((c) => c.id === conv.id)
-              if (exists) return prev
-              return [conv, ...prev].slice(0, 50)
-            })
+            const data = payload as
+              | { type: 'created'; conversation: ConversationSummary }
+              | { type: 'deleted'; conversationId: string }
+            if (data.type === 'created') {
+              const conv = data.conversation
+              setConversations((prev) => {
+                const exists = prev.find((c) => c.id === conv.id)
+                if (exists) return prev
+                return [conv, ...prev].slice(0, 50)
+              })
+            } else if (data.type === 'deleted') {
+              setConversations((prev) => prev.filter((c) => c.id !== data.conversationId))
+              if (data.conversationId === activeConversationIdRef.current) {
+                startNewChat()
+              }
+            }
           }
         },
         onError: (message) => {
@@ -334,6 +350,23 @@ export const useChat = (): UseChatState => {
     }
   }
 
+  const deleteConversation = async (id: string) => {
+    if (!id) return
+    setError(null)
+    try {
+      await deleteConversationApi(id)
+      setConversations((prev) => prev.filter((c) => c.id !== id))
+      if (id === conversationId) {
+        startNewChat()
+      } else {
+        void refreshConversations()
+      }
+    } catch (err) {
+      setError((err as Error).message)
+      throw err
+    }
+  }
+
   return {
     conversationId,
     messages,
@@ -353,6 +386,7 @@ export const useChat = (): UseChatState => {
     conversationsLoading,
     refreshConversations,
     selectConversation,
+    deleteConversation,
     notFound,
   }
 }

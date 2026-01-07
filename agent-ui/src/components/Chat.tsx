@@ -22,6 +22,7 @@ export const Chat = () => {
     conversations,
     conversationsLoading,
     selectConversation,
+    deleteConversation,
     notFound,
   } = useChat()
   const [input, setInput] = useState('')
@@ -31,6 +32,15 @@ export const Chat = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [toast, setToast] = useState<{ message: string; tone: 'info' | 'success' | 'error' } | null>(null)
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [conversationQuery, setConversationQuery] = useState('')
+
+  const normalizedQuery = conversationQuery.trim().toLowerCase()
+  const filteredConversations = conversations.filter((conv) => {
+    if (!normalizedQuery) return true
+    const lastMessageText = conv.lastMessage?.content?.toLowerCase() || ''
+    const idText = conv.id.toLowerCase()
+    return idText.includes(normalizedQuery) || lastMessageText.includes(normalizedQuery)
+  })
 
   const renderSidebarContent = () => (
     <>
@@ -60,6 +70,15 @@ export const Chat = () => {
           </svg>
         </button>
       </div>
+      <div className="px-4 py-2">
+        <input
+          type="search"
+          value={conversationQuery}
+          onChange={(event) => setConversationQuery(event.target.value)}
+          placeholder="Search conversations"
+          className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:border-blue-300 focus:outline-none"
+        />
+      </div>
       <div className="flex items-center justify-between px-4 py-2 text-xs text-slate-600">
         <button
           type="button"
@@ -75,18 +94,21 @@ export const Chat = () => {
         <span>
           {conversationsLoading
             ? 'Loading...'
-            : `${conversations.length} conversation${conversations.length === 1 ? '' : 's'}`}
+            : `${filteredConversations.length} conversation${filteredConversations.length === 1 ? '' : 's'}`}
         </span>
       </div>
-      <div className="h-[calc(100%-120px)] overflow-y-auto px-3 py-2">
+      <div className="h-[calc(100%-176px)] overflow-y-auto px-3 py-2">
         {conversationsLoading && (
           <p className="px-2 py-2 text-xs text-slate-500">Loading conversations...</p>
         )}
         {!conversationsLoading && conversations.length === 0 && (
           <p className="px-2 py-2 text-xs text-slate-500">No conversations yet.</p>
         )}
+        {!conversationsLoading && conversations.length > 0 && filteredConversations.length === 0 && (
+          <p className="px-2 py-2 text-xs text-slate-500">No matches found.</p>
+        )}
         <div className="space-y-2">
-          {conversations.map((conv) => {
+          {filteredConversations.map((conv) => {
             const isActive = conv.id === conversationId
             return (
               <button
@@ -102,9 +124,40 @@ export const Chat = () => {
                   setSidebarOpen(false)
                 }}
               >
-                <div className="flex items-center justify-between text-[11px] text-slate-500">
+                <div className="group relative flex items-center justify-between text-[11px] text-slate-500">
                   <span className="font-mono truncate">{conv.id}</span>
                   <span>{conv.messagesCount} msg</span>
+                  <button
+                    type="button"
+                    className="absolute right-0 top-1/2 z-10 -translate-y-1/2 rounded-md border border-transparent p-1 text-slate-400 opacity-100 transition hover:border-red-200 hover:text-red-500 lg:opacity-0 lg:pointer-events-none lg:group-hover:opacity-100 lg:group-hover:pointer-events-auto"
+                    aria-label="Delete conversation"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      const confirmed = window.confirm(
+                        'Do you really want to delete this conversation?',
+                      )
+                      if (!confirmed) return
+                      void deleteConversation(conv.id)
+                      setSidebarOpen(false)
+                    }}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-3.5 w-3.5"
+                    >
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                      <path d="M10 11v6" />
+                      <path d="M14 11v6" />
+                      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                    </svg>
+                  </button>
                 </div>
                 {conv.lastMessage && (
                   <p className="mt-1 text-xs leading-snug text-slate-700 line-clamp-2">
@@ -135,6 +188,7 @@ export const Chat = () => {
       toastTimerRef.current = null
     }
     if (sseError) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setToast({ message: sseError, tone: 'error' })
     } else {
       let message: string | null = null

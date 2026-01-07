@@ -138,6 +138,17 @@ export class ChatService {
     });
   }
 
+  async deleteConversation(conversationId: string) {
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      throw new HttpError(400, "Invalid conversationId");
+    }
+    const deleted = await Conversation.findByIdAndDelete(conversationId);
+    if (!deleted) {
+      throw new HttpError(404, "Conversation not found");
+    }
+    return deleted;
+  }
+
   async streamAssistantResponse(conversationId: string, userInput: string) {
     try {
       // --- Real OpenAI streaming example (commented) ---
